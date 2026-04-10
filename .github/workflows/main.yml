@@ -33,12 +33,17 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Find DMG
-        id: find_dmg
+      - name: Ad-hoc sign (prevents damaged error)
         run: |
-          DMG=$(find release -name "*.dmg" | head -1)
-          echo "dmg_path=$DMG" >> $GITHUB_OUTPUT
-          echo "Found: $DMG"
+          APP=$(find release/mac-arm64 -name "*.app" -maxdepth 1 | head -1)
+          echo "Signing: $APP"
+          codesign --force --deep --sign - "$APP"
+
+      - name: Repackage signed DMG
+        run: |
+          APP=$(find release/mac-arm64 -name "*.app" -maxdepth 1 | head -1)
+          DMG="release/U-Brands-Social-Suite-arm64.dmg"
+          hdiutil create -volname "U-Brands Social Suite" -srcfolder "$APP" -ov -format UDZO "$DMG"
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
