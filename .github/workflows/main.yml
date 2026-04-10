@@ -1,0 +1,48 @@
+name: Build macOS DMG
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. 1.1.15)'
+        required: true
+        default: '1.1.15'
+
+jobs:
+  build-dmg:
+    runs-on: macos-latest
+    steps:
+      - name: Download source
+        run: |
+          curl -L "https://oijvorghctyucdhnkmtt.supabase.co/storage/v1/object/public/app-releases/ubrands-source.tar.gz" -o source.tar.gz
+          tar -xzf source.tar.gz
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Vite bundle
+        run: npm run build
+
+      - name: Build DMG
+        run: npx electron-builder --mac dmg --arm64
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Find DMG
+        id: find_dmg
+        run: |
+          DMG=$(find release -name "*.dmg" | head -1)
+          echo "dmg_path=$DMG" >> $GITHUB_OUTPUT
+          echo "Found: $DMG"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: U-Brands-Social-Suite-DMG
+          path: release/*.dmg
+          retention-days: 30
