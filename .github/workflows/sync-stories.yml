@@ -1,0 +1,85 @@
+name: Instagram Story Sync
+
+on:
+  schedule:
+    # Every 30 minutes — catches stories before they expire (24h window)
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  sync-stories:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Sync active Instagram stories to Supabase Storage
+        run: |
+          node -e "
+          const ACCOUNT_ID   = process.env.IG_ACCOUNT_ID;
+          const ACCESS_TOKEN = process.env.IG_ACCESS_TOKEN;
+          const SUPABASE_URL = 'https://oijvorghctyucdhnkmtt.supabase.co';
+          const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+          async function main() {
+            // 1. Fetch currently active stories from Instagram API
+            const storyData = await fetch(
+              'https://graph.facebook.com/v21.0/' + ACCOUNT_ID +
+              '/stories?fields=id,timestamp,media_type&limit=100&access_token=' + ACCESS_TOKEN
+            ).then(r => r.json());
+
+            if (storyData.error) {
+              console.error('IG API error:', storyData.error.message);
+              process.exit(1);
+            }
+
+            const active = (storyData.data || []).map(s => ({ id: s.id, timestamp: s.timestamp }));
+            console.log('Active stories right now:', active.length);
+
+            // 2. Read existing cloud story log from Supabase Storage
+            const hdrs = { Authorization: 'Bearer ' + SUPABASE_KEY, apikey: SUPABASE_KEY };
+            let existing = [];
+            const getRes = await fetch(
+              SUPABASE_URL + '/storage/v1/object/story-log/story_log.json',
+              { headers: hdrs }
+            );
+            if (getRes.ok) {
+              try { existing = await getRes.json(); } catch { existing = []; }
+            }
+            console.log('Existing log entries:', existing.length);
+
+            // 3. Merge — deduplicate by story ID
+            const seen     = new Set(existing.map(s => s.id));
+            const newOnes  = active.filter(s => !seen.has(s.id));
+
+            if (!newOnes.length) {
+              console.log('No new stories to log.');
+              return;
+            }
+
+            const merged = [...existing, ...newOnes];
+
+            // 4. Push updated log back to Supabase Storage
+            const putRes = await fetch(
+              SUPABASE_URL + '/storage/v1/object/story-log/story_log.json',
+              {
+                method:  'PUT',
+                headers: { ...hdrs, 'Content-Type': 'application/json', 'x-upsert': 'true' },
+                body:    JSON.stringify(merged),
+              }
+            );
+
+            if (!putRes.ok) {
+              console.error('Supabase upload failed:', await putRes.text());
+              process.exit(1);
+            }
+
+            console.log('Logged', newOnes.length, 'new stories (total in cloud log:', merged.length + ')');
+            newOnes.forEach(s => console.log(' ·', s.timestamp, s.id));
+          }
+
+          main().catch(e => { console.error(e); process.exit(1); });
+          "
+        env:
+          IG_ACCOUNT_ID:        ${{ secrets.IG_ACCOUNT_ID }}
+          IG_ACCESS_TOKEN:      ${{ secrets.IG_ACCESS_TOKEN }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
