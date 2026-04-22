@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <meta http-equiv="Pragma" content="no-cache"/>
+  <meta http-equiv="Expires" content="0"/>
+  <title>Welcome to Sway</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0c0c14;
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #1a1a28;
+      border: 1px solid #252538;
+      border-radius: 20px;
+      padding: 44px 40px;
+      width: 100%;
+      max-width: 460px;
+    }
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+    .logo-icon {
+      width: 52px; height: 52px;
+      background: linear-gradient(135deg, #7c3aed, #5b21b6);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      box-shadow: 0 0 20px rgba(124,58,237,0.4);
+      flex-shrink: 0;
+    }
+    .logo-text h1 { font-size: 18px; font-weight: 700; color: #f1f5f9; }
+    .logo-text p  { font-size: 12px; color: #64748b; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; }
+
+    h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; color: #f8fafc; }
+    .subtitle { color: #94a3b8; font-size: 14px; line-height: 1.6; margin-bottom: 28px; }
+
+    .steps { display: flex; gap: 8px; margin-bottom: 32px; }
+    .step {
+      flex: 1; height: 3px; border-radius: 99px;
+      background: #252538; transition: background 0.3s;
+    }
+    .step.active { background: #7c3aed; }
+    .step.done   { background: #4ade80; }
+
+    label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+    input[type="password"], input[type="text"] {
+      width: 100%; padding: 12px 14px;
+      background: #111118; border: 1px solid #252538; border-radius: 10px;
+      color: #e2e8f0; font-size: 14px; outline: none;
+      transition: border-color 0.15s;
+      margin-bottom: 14px;
+    }
+    input:focus { border-color: #7c3aed; }
+    .btn {
+      width: 100%; padding: 13px;
+      background: linear-gradient(135deg, #7c3aed, #5b21b6);
+      border: none; border-radius: 10px;
+      color: #fff; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: opacity 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn:hover   { opacity: 0.88; }
+    .btn:disabled { opacity: 0.45; cursor: default; }
+    .btn.secondary {
+      background: transparent;
+      border: 1px solid #7c3aed;
+      color: #a78bfa;
+      margin-top: 10px;
+    }
+    .msg { font-size: 13px; margin-bottom: 14px; padding: 10px 12px; border-radius: 8px; }
+    .msg.error   { background: rgba(239,68,68,0.1);  color: #f87171; }
+    .msg.success { background: rgba(74,222,128,0.1); color: #86efac; }
+
+    .download-box {
+      background: linear-gradient(135deg, rgba(124,58,237,0.12), rgba(91,33,182,0.06));
+      border: 1px solid rgba(124,58,237,0.3);
+      border-radius: 14px; padding: 24px; text-align: center; margin-bottom: 24px;
+    }
+    .download-box .icon { font-size: 40px; margin-bottom: 12px; }
+    .download-box h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .download-box p  { color: #94a3b8; font-size: 13px; margin-bottom: 18px; }
+    .download-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg, #7c3aed, #5b21b6);
+      color: #fff; text-decoration: none;
+      padding: 12px 24px; border-radius: 10px;
+      font-size: 14px; font-weight: 600;
+      transition: opacity 0.15s; cursor: pointer;
+      border: none;
+    }
+    .download-btn:hover { opacity: 0.88; }
+    .download-btn.disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+
+    .instructions { margin-top: 24px; }
+    .instructions h4 { font-size: 13px; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+    .step-list { list-style: none; padding: 0; margin: 0; }
+    .step-list li {
+      display: table; width: 100%;
+      padding: 10px 0; border-bottom: 1px solid #1e1e2e;
+      font-size: 13px; color: #94a3b8; line-height: 1.6;
+    }
+    .step-list li:last-child { border-bottom: none; }
+    .step-num {
+      display: table-cell; width: 30px; padding-right: 12px;
+      vertical-align: top; padding-top: 1px;
+    }
+    .step-num span {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px;
+      background: rgba(124,58,237,0.2); border: 1px solid rgba(124,58,237,0.35);
+      border-radius: 50%;
+      font-size: 11px; font-weight: 700; color: #a78bfa;
+    }
+    .step-text { display: table-cell; vertical-align: top; }
+
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid #252538;
+      border-top-color: #7c3aed; border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .text-center { text-align: center; }
+    .text-muted { color: #475569; font-size: 12px; margin-top: 24px; text-align: center; }
+    #view-loading, #view-password, #view-download { display: none; }
+    #view-loading.show, #view-password.show, #view-download.show { display: block; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <!-- Logo -->
+  <div class="logo-wrap">
+    <div class="logo-icon" style="background:#0a0a0a;color:#fff;font-weight:800;font-size:22px;border-radius:12px;width:48px;height:48px;display:flex;align-items:center;justify-content:center">#</div>
+    <div class="logo-text">
+      <h1>Sway</h1>
+      <p>by U Brands</p>
+    </div>
+  </div>
+
+  <!-- Step indicators -->
+  <div class="steps" id="step-indicators">
+    <div class="step active" id="step-dot-1"></div>
+    <div class="step" id="step-dot-2"></div>
+  </div>
+
+  <!-- View: Loading -->
+  <div id="view-loading" class="show text-center">
+    <div class="spinner"></div>
+    <p style="color:#64748b;font-size:14px;">Setting up your account…</p>
+  </div>
+
+  <!-- View: Set Password -->
+  <div id="view-password">
+    <h2>Welcome to the team! 👋</h2>
+    <p class="subtitle">You've been invited to Sway. Set a password to secure your account, then you can download the app.</p>
+
+    <div id="pw-error"></div>
+
+    <label>New password</label>
+    <input type="password" id="pw1" placeholder="At least 8 characters" autocomplete="new-password"/>
+
+    <label>Confirm password</label>
+    <input type="password" id="pw2" placeholder="Re-enter password" autocomplete="new-password"/>
+
+    <button class="btn" id="pw-btn" onclick="setPassword()">
+      <span>Set Password &amp; Continue</span>
+      <span>→</span>
+    </button>
+  </div>
+
+  <!-- View: Download -->
+  <div id="view-download">
+    <h2 style="color:#86efac;">Password saved! ✓</h2>
+    <p class="subtitle" style="margin-bottom:20px;">Now download the app, install it, and sign in with your work email and the password you just set.</p>
+
+    <div class="download-box">
+      <div class="icon">💻</div>
+      <h3>Sway</h3>
+      <p id="download-version">Mac · Apple Silicon (M-series)</p>
+      <a class="download-btn disabled" id="download-link" href="#" target="_blank" rel="noopener noreferrer">
+        <span>⬇</span> Download for Mac
+      </a>
+      <p style="color:#64748b;font-size:11px;margin-top:10px;">Click the button above — a .dmg installer will download</p>
+    </div>
+
+    <div class="instructions">
+      <h4>How to install — 3 steps</h4>
+      <ol class="step-list">
+        <li><span class="step-num"><span>1</span></span><span class="step-text"><strong>Open the .dmg</strong> — double-click it in your Downloads folder. A window will appear with the app icon.</span></li>
+        <li><span class="step-num"><span>2</span></span><span class="step-text"><strong>Drag to Applications</strong> — drag <strong>Sway</strong> into the <strong>Applications</strong> shortcut in that window.</span></li>
+        <li><span class="step-num"><span>3</span></span><span class="step-text"><strong>Approve the app</strong> — macOS may say it can't verify the developer. Go to <strong>System Settings → Privacy &amp; Security</strong>, scroll down, and click <strong>"Open Anyway"</strong>. Only needed once.</span></li>
+        <li><span class="step-num"><span>4</span></span><span class="step-text"><strong>Sign in</strong> — use your work email and the password you just set on this page.</span></li>
+      </ol>
+    </div>
+  </div>
+
+  <p class="text-muted">Sway · by U Brands</p>
+</div>
+
+<script>
+(function() {
+  const SUPABASE_URL = 'https://oijvorghctyucdhnkmtt.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9panZvcmdoY3R5dWNkaG5rbXR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NzkxNjEsImV4cCI6MjA5MTE1NTE2MX0.Cef7C4BWvZg760EXU2zWl8yodomcE_iDG5mGRCVnm9Y';
+  const { createClient } = window.supabase;
+  const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  function show(viewId) {
+    ['view-loading','view-password','view-download'].forEach(id => {
+      document.getElementById(id).classList.toggle('show', id === viewId);
+    });
+    // Update step dots
+    const s1 = document.getElementById('step-dot-1');
+    const s2 = document.getElementById('step-dot-2');
+    if (viewId === 'view-password') { s1.className='step active'; s2.className='step'; }
+    if (viewId === 'view-download') { s1.className='step done';   s2.className='step active done'; }
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('pw-error');
+    el.innerHTML = msg ? `<div class="msg error">${msg}</div>` : '';
+  }
+
+  // Lock the form when the session is confirmed missing (expired/refreshed link)
+  function lockFormExpired() {
+    show('view-password');
+    showError('Your invite link has expired or has already been used. Please ask your admin to send you a new invite.');
+    const btn = document.getElementById('pw-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span>Link expired — contact your admin</span>';
+    document.getElementById('pw1').disabled = true;
+    document.getElementById('pw2').disabled = true;
+  }
+
+  // Flag: once password is set and user is on the download view, ignore further auth events
+  let passwordSetDone = false;
+  // Flag: session confirmed valid (SIGNED_IN / PASSWORD_RECOVERY received)
+  let sessionConfirmed = false;
+
+  // Supabase detects session tokens from URL hash automatically
+  // PASSWORD_RECOVERY fires for recovery-type links; SIGNED_IN fires for invite-type links
+  client.auth.onAuthStateChange((event, session) => {
+    // Don't let USER_UPDATED or any late-firing event yank the user back to the password form
+    if (passwordSetDone) return;
+
+    if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+      sessionConfirmed = true;
+      show('view-password');
+      showError('');
+    } else if (event === 'INITIAL_SESSION' && !session) {
+      // No valid token found — expired or page was refreshed after initial load
+      lockFormExpired();
+    }
+    // For any other event with no session, stay on loading until INITIAL_SESSION fires
+  });
+
+  // Safety fallback: if nothing fires within 5s, show expired message and lock form
+  setTimeout(() => {
+    if (document.getElementById('view-loading').classList.contains('show')) {
+      lockFormExpired();
+    }
+  }, 5000);
+
+  window.setPassword = async function() {
+    const pw1 = document.getElementById('pw1').value;
+    const pw2 = document.getElementById('pw2').value;
+    const btn = document.getElementById('pw-btn');
+    showError('');
+
+    if (pw1.length < 8) { showError('Password must be at least 8 characters.'); return; }
+    if (pw1 !== pw2)    { showError("Passwords don't match — please try again."); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span>Saving…</span>';
+
+    const { error } = await client.auth.updateUser({ password: pw1 });
+    if (error) {
+      // Translate raw Supabase errors into friendly messages
+      const msg = error.message || '';
+      if (msg.toLowerCase().includes('session') || msg.toLowerCase().includes('token') || msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('invalid')) {
+        showError('Your invite link has expired or is no longer valid. Please ask your admin to send you a new invite.');
+        btn.disabled = true;
+        btn.innerHTML = '<span>Link expired — contact your admin</span>';
+        document.getElementById('pw1').disabled = true;
+        document.getElementById('pw2').disabled = true;
+      } else {
+        showError('Something went wrong — please try again. If the problem persists, ask your admin to resend your invite.');
+        btn.disabled = false;
+        btn.innerHTML = '<span>Set Password &amp; Continue</span><span>→</span>';
+      }
+      return;
+    }
+
+    // Lock out the auth state listener — USER_UPDATED fires after updateUser and
+    // would otherwise reset the view back to the password form.
+    passwordSetDone = true;
+
+    // The installer is always the latest GitHub release DMG.
+    // This URL automatically resolves to whatever is newest — no DB lookup needed.
+    const DMG_URL = 'https://github.com/Dmardikian/ubrands-social-suite-releases/releases/latest/download/Sway.dmg';
+
+    const link = document.getElementById('download-link');
+    link.href = DMG_URL;
+    link.classList.remove('disabled');
+
+    // Separately fetch the version number for the label
+    try {
+      const { data: updateData } = await client
+        .from('app_updates')
+        .select('version')
+        .order('created_at', { ascending: false })
+        .limit(1).single();
+      if (updateData?.version) {
+        document.getElementById('download-version').textContent =
+          `v${updateData.version} · Mac · Apple Silicon (M-series)`;
+      }
+    } catch (_) { /* version label is non-critical */ }
+
+    show('view-download');
+  };
+})();
+</script>
+</body>
+</html>
