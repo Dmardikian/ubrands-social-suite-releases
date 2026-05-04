@@ -216,14 +216,20 @@
 (function() {
   const SUPABASE_URL = 'https://oijvorghctyucdhnkmtt.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9panZvcmdoY3R5dWNkaG5rbXR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NzkxNjEsImV4cCI6MjA5MTE1NTE2MX0.Cef7C4BWvZg760EXU2zWl8yodomcE_iDG5mGRCVnm9Y';
+  const DMG_URL = 'https://github.com/Dmardikian/ubrands-social-suite-releases/releases/latest/download/Sway.dmg';
   const { createClient } = window.supabase;
-  const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+  // Supabase JS v2 persists sessions to localStorage automatically when
+  // persistSession is true (the default). This means page refreshes and
+  // accidental back/forward navigations will recover the session from
+  // localStorage instead of failing with "Auth session missing".
+  const client = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
 
   function show(viewId) {
     ['view-loading','view-password','view-download'].forEach(id => {
       document.getElementById(id).classList.toggle('show', id === viewId);
     });
-    // Update step dots
     const s1 = document.getElementById('step-dot-1');
     const s2 = document.getElementById('step-dot-2');
     if (viewId === 'view-password') { s1.className='step active'; s2.className='step'; }
@@ -235,45 +241,79 @@
     el.innerHTML = msg ? `<div class="msg error">${msg}</div>` : '';
   }
 
-  // Lock the form when the session is confirmed missing (expired/refreshed link)
+  // Show the download page (reusable — called after password set and on revisit)
+  async function showDownload() {
+    const link = document.getElementById('download-link');
+    link.href = DMG_URL;
+    link.classList.remove('disabled');
+    try {
+      const { data: updateData } = await client
+        .from('app_updates').select('version')
+        .order('created_at', { ascending: false }).limit(1).single();
+      if (updateData?.version) {
+        document.getElementById('download-version').textContent =
+          `v${updateData.version} · Mac · Apple Silicon (M-series)`;
+      }
+    } catch (_) { /* version label is non-critical */ }
+    show('view-download');
+  }
+
+  // Lock the form when the session is truly gone (expired invite link)
   function lockFormExpired() {
     show('view-password');
-    showError('Your invite link has expired or has already been used. Please ask your admin to send you a new invite.');
+    showError('Your invite link has expired or was already used.<br>Please ask Danny to resend your invite from the Sway app.');
     const btn = document.getElementById('pw-btn');
     btn.disabled = true;
-    btn.innerHTML = '<span>Link expired — contact your admin</span>';
+    btn.innerHTML = '<span>Link expired</span>';
     document.getElementById('pw1').disabled = true;
     document.getElementById('pw2').disabled = true;
   }
 
-  // Flag: once password is set and user is on the download view, ignore further auth events
   let passwordSetDone = false;
-  // Flag: session confirmed valid (SIGNED_IN / PASSWORD_RECOVERY received)
   let sessionConfirmed = false;
 
-  // Supabase detects session tokens from URL hash automatically
-  // PASSWORD_RECOVERY fires for recovery-type links; SIGNED_IN fires for invite-type links
-  client.auth.onAuthStateChange((event, session) => {
-    // Don't let USER_UPDATED or any late-firing event yank the user back to the password form
+  client.auth.onAuthStateChange(async (event, session) => {
     if (passwordSetDone) return;
 
     if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
       sessionConfirmed = true;
+
+      // If the user already has a confirmed email, they've already set their
+      // password (possibly on a previous visit). Skip straight to download.
+      if (session?.user?.email_confirmed_at && session?.user?.updated_at &&
+          session.user.updated_at !== session.user.created_at) {
+        passwordSetDone = true;
+        await showDownload();
+        return;
+      }
       show('view-password');
       showError('');
-    } else if (event === 'INITIAL_SESSION' && !session) {
-      // No valid token found — expired or page was refreshed after initial load
-      lockFormExpired();
+    } else if (event === 'INITIAL_SESSION') {
+      if (session) {
+        // Session recovered from localStorage (page refresh / revisit).
+        sessionConfirmed = true;
+        // If user already set password previously, go straight to download.
+        if (session.user?.email_confirmed_at && session.user?.updated_at &&
+            session.user.updated_at !== session.user.created_at) {
+          passwordSetDone = true;
+          await showDownload();
+        } else {
+          show('view-password');
+          showError('');
+        }
+      } else {
+        // No token in URL and nothing in localStorage — truly expired.
+        lockFormExpired();
+      }
     }
-    // For any other event with no session, stay on loading until INITIAL_SESSION fires
   });
 
-  // Safety fallback: if nothing fires within 5s, show expired message and lock form
+  // Safety fallback: if nothing fires within 8s, show expired message
   setTimeout(() => {
     if (document.getElementById('view-loading').classList.contains('show')) {
       lockFormExpired();
     }
-  }, 5000);
+  }, 8000);
 
   window.setPassword = async function() {
     const pw1 = document.getElementById('pw1').value;
@@ -282,55 +322,30 @@
     showError('');
 
     if (pw1.length < 8) { showError('Password must be at least 8 characters.'); return; }
-    if (pw1 !== pw2)    { showError("Passwords don't match — please try again."); return; }
+    if (pw1 !== pw2)    { showError("Passwords don't match. Please try again."); return; }
 
     btn.disabled = true;
     btn.innerHTML = '<span>Saving…</span>';
 
     const { error } = await client.auth.updateUser({ password: pw1 });
     if (error) {
-      // Translate raw Supabase errors into friendly messages
       const msg = error.message || '';
       if (msg.toLowerCase().includes('session') || msg.toLowerCase().includes('token') || msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('invalid')) {
-        showError('Your invite link has expired or is no longer valid. Please ask your admin to send you a new invite.');
+        showError('Your session has expired. Please ask Danny to resend your invite from the Sway app.');
         btn.disabled = true;
-        btn.innerHTML = '<span>Link expired — contact your admin</span>';
+        btn.innerHTML = '<span>Session expired</span>';
         document.getElementById('pw1').disabled = true;
         document.getElementById('pw2').disabled = true;
       } else {
-        showError('Something went wrong — please try again. If the problem persists, ask your admin to resend your invite.');
+        showError('Something went wrong. Please try again, or ask Danny to resend your invite.');
         btn.disabled = false;
         btn.innerHTML = '<span>Set Password &amp; Continue</span><span>→</span>';
       }
       return;
     }
 
-    // Lock out the auth state listener — USER_UPDATED fires after updateUser and
-    // would otherwise reset the view back to the password form.
     passwordSetDone = true;
-
-    // The installer is always the latest GitHub release DMG.
-    // This URL automatically resolves to whatever is newest — no DB lookup needed.
-    const DMG_URL = 'https://github.com/Dmardikian/ubrands-social-suite-releases/releases/latest/download/Sway.dmg';
-
-    const link = document.getElementById('download-link');
-    link.href = DMG_URL;
-    link.classList.remove('disabled');
-
-    // Separately fetch the version number for the label
-    try {
-      const { data: updateData } = await client
-        .from('app_updates')
-        .select('version')
-        .order('created_at', { ascending: false })
-        .limit(1).single();
-      if (updateData?.version) {
-        document.getElementById('download-version').textContent =
-          `v${updateData.version} · Mac · Apple Silicon (M-series)`;
-      }
-    } catch (_) { /* version label is non-critical */ }
-
-    show('view-download');
+    await showDownload();
   };
 })();
 </script>
